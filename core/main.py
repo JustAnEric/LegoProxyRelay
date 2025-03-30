@@ -1,4 +1,5 @@
-import websocket, time, sys, rel
+import websocket, time, sys, rel, json
+from httpx import Client
 
 class WebSocket():
     class InternalWSEV():
@@ -32,6 +33,26 @@ class WebSocket():
                 print("Relay client hasn't completed authentication: invalid relay password")
                 print(self._app.connect_stage)
                 self._app.connect_stage = -10
+            if data.startswith('HTTP'):
+                # get ready to receive the next relay message
+                print("Message received, beginning JSON transmission")
+                id = data.split('HTTP ')[1]
+                self._app.relay_accept_stage = 1
+                self._app.relay_accept_data = {'id': id}
+            if data.startswith('{') and self._app.relay_accept_stage == 1:
+                self._app.relay_accept_stage = 0
+                id = self._app.relay_accept_data['id']
+                self._app.relay_accept_data = {}
+                d = json.loads(data)
+                with Client() as cli:
+                    if d['query'] == "None":
+                        req = cli.build_request(d['method'], f"https://{d['api']}.roblox.com/{d['endpoint']}", json=data)
+                    else:
+                        req = cli.build_request(d['method'], f"https://{d['api']}.roblox.com/{d['endpoint']}?{d['query']}", json=data)
+
+                    res = cli.send(req)
+                    response = res.json()
+                ws.send(json.dumps({"id": id, "response": response}))
             ...
             
         def on_error(self, ws:websocket.WebSocket, exception: Exception):
@@ -46,6 +67,8 @@ class WebSocket():
         self.logging = True
         self.reconnect_delay = 5
         self.connect_stage = 0
+        self.relay_accept_stage = 0
+        self.relay_accept_data = {}
         self.connect_stage_data = {}
         self.wse = self.InternalWSEV(self)
         
