@@ -1,4 +1,5 @@
 import websocket, time, sys, rel, json
+from .cli import bcolors
 from httpx import Client
 
 class WebSocket():
@@ -16,27 +17,24 @@ class WebSocket():
             ...
             
         def on_message(self, ws:websocket.WebSocket, data: str):
-            print(data, self._app.connect_stage)
             if data == "true" and self._app.connect_stage == 1:
                 ws.send(str(self._app.connect_stage_data.get('password')))
-                print(self._app.connect_stage)
                 self._app.connect_stage = 2
             if data == "false" and self._app.connect_stage == 1:
                 print("Relay client has completed authentication successfully: no password")
-                print(self._app.connect_stage)
                 self._app.connect_stage = -1 # authenticated
             if data == "authenticated" and self._app.connect_stage == 2:
                 print("Relay client has completed authentication successfully")
-                print(self._app.connect_stage)
                 self._app.connect_stage = -1 # authenticated
             if data == "notauthenticated" and self._app.connect_stage == 2:
                 print("Relay client hasn't completed authentication: invalid relay password")
-                print(self._app.connect_stage)
                 self._app.connect_stage = -10
             if data.startswith('HTTP'):
                 # get ready to receive the next relay message
+                print()
                 print("Message received, beginning JSON transmission")
                 id = data.split('HTTP ')[1]
+                print(f"{bcolors.BckgrBlue}⌈↳{bcolors.NC} {id} HTTP")
                 self._app.relay_accept_stage = 1
                 self._app.relay_accept_data = {'id': id}
             if data.startswith('{') and self._app.relay_accept_stage == 1:
@@ -44,6 +42,7 @@ class WebSocket():
                 id = self._app.relay_accept_data['id']
                 self._app.relay_accept_data = {}
                 d = json.loads(data)
+                print(f"| ({id}) {bcolors.Blink}{bcolors.DarkGray}=->{bcolors.NC} {d['method']} https://{d['api']}.roblox.com/{d['endpoint']}{'?{}'.format(d['query']) if d['query'] != "None" else '?'} {bcolors.Red}x{bcolors.NC}{bcolors.Blink}{bcolors.Green}>{bcolors.NC} {self._app.websocket_url}")
                 with Client() as cli:
                     if d['query'] == "None":
                         req = cli.build_request(d['method'], f"https://{d['api']}.roblox.com/{d['endpoint']}", json=data)
@@ -53,6 +52,7 @@ class WebSocket():
                     res = cli.send(req)
                     response = res.json()
                 ws.send(json.dumps({"id": id, "response": response}))
+                print(f"| ({id}) {bcolors.Green}<->{bcolors.NC} {d['method']} https://{d['api']}.roblox.com/{d['endpoint']}{'?{}'.format(d['query']) if d['query'] != "None" else '?'} {bcolors.Yellow}={bcolors.NC}{bcolors.Green}>{bcolors.NC} {self._app.websocket_url}")
             ...
             
         def on_error(self, ws:websocket.WebSocket, exception: Exception):
