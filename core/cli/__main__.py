@@ -1,18 +1,24 @@
-import sys, os, argparse, json
+import sys, os, argparse, json, threading
 from ..main import WebSocket
 from .bcolors import *
 
 parser = argparse.ArgumentParser(description="LegoProxy Relay Command Line Tool", prog=sys.argv[0])
 group = parser.add_subparsers(title='LegoProxy Relay Command Line Tool', description='Commands to manage the Relay runtime.', required=True)
 
-rungroup = group.add_parser(name='run', help='Command to run the Relay Server.')
+rungroup = group.add_parser(name='run', help='Command to run the Relay Client.')
+spawngroup = group.add_parser(name='spawn', help='Commands to spawn a set of Relay tasks/clients.')
 configgroup = group.add_parser(name='config', help='Commands to manage the Relay configuration.')
 
 rungroup.add_argument('...', type=str, help='Do not use')
 rungroup.add_argument('relay_address', type=str, help="The Proxy Address of your server, e.g. 0.0.0.0:8080/relay or 0.0.0.0:8080 or 0.0.0.0/relay")
 rungroup.add_argument('relay_id', type=int, help="The Relay identifier of your client, e.g. 0")
-rungroup.add_argument('--password', type=str, help="The Proxy's relay password set on your server.", required=False, default="")
+rungroup.add_argument('--password', type=str, help="The Proxy's relay password set on your client.", required=False, default="")
 rungroup.add_argument('--config', type=str, help="The JSON Relay configuration file to use.", required=False, default="")
+
+spawngroup.add_argument('...', type=str, help='Do not use')
+spawngroup.add_argument('relay_address', type=str, help="The Proxy Address of your server, e.g. 0.0.0.0:8080/relay or 0.0.0.0:8080 or 0.0.0.0/relay")
+spawngroup.add_argument('--password', type=str, help="The Proxy's relay password set on your client.", required=False, default="")
+spawngroup.add_argument('-t', type=int, help='How many clients to spawn, max 50', required=True)
 
 configgroup.add_argument('...', type=str, help='Do not use')
 configgroup.add_argument('config_file', type=str, help="Configuration file path.")
@@ -21,10 +27,13 @@ configgroup.add_argument('--name', type=str, help="The name of the configuration
 configgroup.add_argument('--value', type=str, help="The value of the configuration file key.", required=False, default="")
 
 runargs = []
+spawnargs = []
 configargs = []
 
 if sys.argv[1] == "run":
     runargs = rungroup.parse_args()
+if sys.argv[1] == "spawn":
+    spawnargs = spawngroup.parse_args()
 elif sys.argv[1] == "config":
     configargs = configgroup.parse_args()
 
@@ -35,6 +44,21 @@ if runargs != []:
             wsRelay = WebSocket()
 
             wsRelay.start((runargs.relay_address or "0.0.0.0/relay"), (runargs.relay_id or 0), ((runargs.password if hasattr(runargs,'password') else None) or ""))
+            
+if spawnargs != []:
+    if hasattr(spawnargs,'t'):
+        if spawnargs.t:
+            if spawnargs.t <= 50:
+                for i in range(spawnargs.t):
+                    def t():
+                        wsRelay = WebSocket(dispatcher=False)
+                        wsRelay.start((spawnargs.relay_address or "0.0.0.0/relay"), i, ((spawnargs.password if hasattr(spawnargs,'password') else None) or ""))
+                    ht = threading.Thread(target=t, daemon=True)
+                    ht.start()
+                print("Summoned all")
+                try: 
+                    while True: pass
+                except KeyboardInterrupt: pass
 
 if configargs != []:
     if hasattr(configargs,'config_file'):

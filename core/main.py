@@ -112,7 +112,7 @@ class WebSocket():
                 )
     
     
-    def __init__(self):
+    def __init__(self, *, dispatcher:bool=True):
         self.websocket_url = "ws://websocket.example.com"
         self.relay_id = None
         self.relay_password = None
@@ -124,6 +124,7 @@ class WebSocket():
         self.relay_accept_data = {}
         self.connect_stage_data = {}
         self.last_request_id = None
+        self.dispatcher_allowed = dispatcher
         self.wse = self.InternalWSEV(self)
         self.log = Logger(self)
         
@@ -156,6 +157,9 @@ class WebSocket():
             on_error = self.wse.on_error
         )
         
-        self.websocket_client.run_forever(dispatcher=rel)
-        rel.signal(2, rel.abort)  # Keyboard Interrupt
-        rel.dispatch()
+        if self.dispatcher_allowed:
+            self.websocket_client.run_forever(dispatcher=rel)
+            rel.signal(2, rel.abort)  # Keyboard Interrupt
+            rel.dispatch()
+        else:
+            self.websocket_client.run_forever()
