@@ -46,17 +46,19 @@ class WebSocket():
                 
                 self._app.log.log_begin_json_transmission(id)
                 
-                self._app.relay_accept_stage = 1
-                self._app.relay_accept_data = {'id': id}
+                #self._app.relay_accept_stage = 1
+                #self._app.relay_accept_data = {'id': id}
             
-            if data.startswith('{') and self._app.relay_accept_stage == 1:
+            if data.startswith('{'):
                 while self._app.last_request_id != None: pass
                 
-                self._app.relay_accept_stage = 0
-                id = self._app.relay_accept_data['id']
-                self._app.relay_accept_data = {}
+                #self._app.relay_accept_stage = 0
+                #id = self._app.relay_accept_data['id']
+                #self._app.relay_accept_data = {}
                 
                 d = json.loads(data)
+                
+                id = d.get('_id')
                 
                 self._app.log.log_start_request_transmission(id, d)
                 
